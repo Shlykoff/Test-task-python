@@ -6,7 +6,7 @@
 
 - Docker
 - Docker Compose plugin (`docker compose`)
-- свободные порты: `80`, `5432`, `5672`, `6379`, `3000`, `9090`, `15672`, `16686`, `3100`
+- Убедись, что Docker запущен и порты не заняты.
 
 ## Быстрый старт с нуля
 
@@ -91,6 +91,16 @@ done
   - `http://localhost/orders/docs`
   - `http://localhost/billing/docs`
   - `http://localhost/notifications/docs`
+- Логи (Grafana): `http://localhost:3000` (`admin` / `admin`)
+
+### Как смотреть логи в Grafana
+
+1. Открой `http://localhost:3000` и войди под `admin` / `admin`.
+2. Перейди в `Explore`.
+3. В выпадающем списке datasource выбери `Loki`.
+4. Выполни запрос, например: `{container=~".*"}`.
+5. Чтобы смотреть конкретный сервис, фильтруй по контейнеру, например:
+   `{container="order-service"}` или `{container="user-service"}`.
 
 ## Актуальные API-префиксы
 
