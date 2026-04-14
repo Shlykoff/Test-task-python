@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Docs — Все сервисы</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; }
+        .topbar {
+            background: #1b1b1b;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .topbar h1 {
+            color: #fff;
+            font-size: 1.2rem;
+            margin: 0;
+        }
+        .topbar select {
+            padding: 6px 12px;
+            font-size: 1rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+        }
+        #swagger { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>📚 API Docs</h1>
+        <select id="serviceSelect">
+            <option value="/auth/openapi.json">Auth Service</option>
+            <option value="/user/openapi.json">User Service</option>
+            <option value="/products/openapi.json">Product Service</option>
+            <option value="/cart/openapi.json">Cart Service</option>
+            <option value="/orders/openapi.json">Order Service</option>
+            <option value="/billing/openapi.json">Billing Service</option>
+            <option value="/notifications/openapi.json">Notification Service</option>
+        </select>
+    </div>
+    <div id="swagger"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        const services = {
+            '/auth/openapi.json': 'Auth Service',
+            '/user/openapi.json': 'User Service',
+            '/products/openapi.json': 'Product Service',
+            '/cart/openapi.json': 'Cart Service',
+            '/orders/openapi.json': 'Order Service',
+            '/billing/openapi.json': 'Billing Service',
+            '/notifications/openapi.json': 'Notification Service',
+        };
+
+        let ui = null;
+
+        function createSwagger(url) {
+            const el = document.getElementById('swagger');
+            el.innerHTML = '';
+            ui = SwaggerUIBundle({
+                url: url,
+                dom_id: '#swagger',
+                presets: [SwaggerUIBundle.presets.apis],
+            });
+        }
+
+        createSwagger('/auth/openapi.json');
+
+        document.getElementById('serviceSelect').addEventListener('change', function() {
+            createSwagger(this.value);
+        });
+    </script>
+</body>
+</html>

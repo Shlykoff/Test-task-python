@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онлайн-магазин (микросервисы)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: #2c3e50; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.5rem; }
+        .header-right { display: flex; gap: 15px; align-items: center; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #219a52; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-small { padding: 4px 10px; font-size: 0.8rem; }
+        .card { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .product-card { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; display: flex; flex-direction: column; }
+        .product-card h3 { margin-bottom: 8px; color: #2c3e50; }
+        .product-card .description { color: #777; font-size: 0.9rem; margin-bottom: 10px; flex-grow: 1; }
+        .product-card .price { font-size: 1.3rem; font-weight: bold; color: #27ae60; margin-bottom: 10px; }
+        .product-card .stock { font-size: 0.85rem; color: #888; margin-bottom: 12px; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: white; border: none; cursor: pointer; border-radius: 6px 6px 0 0; font-size: 0.9rem; }
+        .tab.active { background: #3498db; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .badge-info { background: #3498db; color: white; }
+        .badge-success { background: #27ae60; color: white; }
+        .badge-warning { background: #f39c12; color: white; }
+        .badge-danger { background: #e74c3c; color: white; }
+        #notifications { max-height: 300px; overflow-y: auto; }
+        .notification { padding: 10px 15px; border-left: 4px solid #3498db; background: #f8f9fa; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
+        .notification.success { border-left-color: #27ae60; }
+        .notification.error { border-left-color: #e74c3c; }
+        .notification .time { font-size: 0.75rem; color: #888; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .cart-item:last-child { border-bottom: none; }
+        .cart-total { font-size: 1.2rem; font-weight: bold; text-align: right; margin-top: 15px; padding-top: 15px; border-top: 2px solid #eee; }
+        .order-item { padding: 5px 0; }
+        .error-msg { color: #e74c3c; font-size: 0.85rem; margin-top: 5px; }
+        .success-msg { color: #27ae60; font-size: 0.85rem; margin-top: 5px; }
+        .status-paid { color: #27ae60; font-weight: bold; }
+        .status-pending { color: #f39c12; font-weight: bold; }
+        .status-cancelled { color: #e74c3c; font-weight: bold; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; border-radius: 12px; padding: 30px; max-width: 400px; width: 90%; }
+        .modal h2 { margin-bottom: 20px; }
+        .ws-status { font-size: 0.8rem; }
+        .ws-connected { color: #27ae60; }
+        .ws-disconnected { color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🛒 Онлайн-магазин</h1>
+    <div class="header-right">
+        <span id="wsStatus" class="ws-status ws-disconnected">⚡ WS: отключён</span>
+        <span id="userInfo" style="display:none">
+            <span id="usernameDisplay"></span> | 
+            Баланс: <span id="balanceDisplay">0</span> ₽
+        </span>
+        <button id="authBtn" class="btn btn-primary" onclick="showAuthModal()">Войти</button>
+        <button id="logoutBtn" class="btn btn-danger" style="display:none" onclick="logout()">Выйти</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('products')">🛍 Каталог</button>
+        <button class="tab" onclick="switchTab('cart')">🛒 Корзина <span id="cartCount" class="badge badge-info" style="display:none">0</span></button>
+        <button class="tab" onclick="switchTab('orders')">📦 Мои заказы</button>
+        <button class="tab" onclick="switchTab('notifications')">🔔 Уведомления <span id="notifCount" class="badge badge-warning" style="display:none">0</span></button>
+    </div>
+
+    <!-- Каталог -->
+    <div id="productsTab" class="tab-content active">
+        <div class="grid" id="productsGrid">
+            <p>Загрузка товаров...</p>
+        </div>
+    </div>
+
+    <!-- Корзина -->
+    <div id="cartTab" class="tab-content">
+        <div class="card">
+            <h2>Корзина</h2>
+            <div id="cartItems"><p>Корзина пуста</p></div>
+            <div id="cartTotalSection" style="display:none">
+                <div class="cart-total">Итого: <span id="cartTotal">0</span> ₽</div>
+                <div style="text-align:right; margin-top:15px">
+                    <button class="btn btn-danger btn-small" onclick="clearCart()">Очистить</button>
+                    <button class="btn btn-success" onclick="createOrder()" id="checkoutBtn">Оформить заказ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Заказы -->
+    <div id="ordersTab" class="tab-content">
+        <div class="card">
+            <h2>Мои заказы</h2>
+            <div id="ordersList"><p>Войдите, чтобы увидеть заказы</p></div>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div id="notificationsTab" class="tab-content">
+        <div class="card">
+            <h2>Уведомления</h2>
+            <div id="notifications"><p>Подключитесь для получения уведомлений</p></div>
+        </div>
+    </div>
+</div>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+    <div class="modal">
+        <h2 id="authTitle">Вход</h2>
+        <div id="authError" class="error-msg"></div>
+        <div id="authSuccess" class="success-msg"></div>
+        <div class="form-group">
+            <label>Имя пользователя</label>
+            <input type="text" id="authUsername" placeholder="username">
+        </div>
+        <div class="form-group" id="authEmailGroup" style="display:none">
+            <label>Email</label>
+            <input type="email" id="authEmail" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" id="authPassword" placeholder="password">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="handleAuth(); return false;" id="authActionBtn">Войти</button>
+        <p style="margin-top:15px; font-size:0.9rem; color:#888">
+            <span id="authSwitchText">Нет аккаунта?</span>
+            <a href="javascript:void(0)" onclick="toggleAuthMode()" id="authSwitchLink">Зарегистрироваться</a>
+        </p>
+        <p style="margin-top:10px; font-size:0.8rem; color:#aaa">
+            Тестовый: testuser / testpassword
+        </p>
+    </div>
+</div>
+
+<script>
+const API = '';
+let accessToken = null;
+let refreshToken = null;
+let currentUser = null;
+let sessionId = null;
+let ws = null;
+let authMode = 'login'; // 'login' or 'register'
+let notifCount = 0;
+
+// --- Start ---
+document.addEventListener('DOMContentLoaded', function() {
+    init();
+});
+
+async function init() {
+    sessionId = localStorage.getItem('session_id') || generateUUID();
+    localStorage.setItem('session_id', sessionId);
+    
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        accessToken = token;
+        refreshToken = localStorage.getItem('refresh_token');
+        await loadProfile();
+        document.getElementById('authBtn').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = '';
+        document.getElementById('userInfo').style.display = '';
+        connectWebSocket();
+    }
+    
+    await loadProducts();
+    await loadCart();
+}
+
+// --- Helpers ---
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
+function formatTime(date) {
+    return new Date(date).toLocaleTimeString('ru-RU');
+}
+
+// --- Tabs ---
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(tab + 'Tab').classList.add('active');
+
+    if (tab === 'cart') loadCart();
+    if (tab === 'orders' && accessToken) loadOrders();
+    if (tab === 'notifications') loadNotifications(currentUser?.id);
+}
+
+// --- Auth Modal ---
+function showAuthModal() {
+    document.getElementById('authModal').classList.add('active');
+}
+
+function hideAuthModal() {
+    document.getElementById('authModal').classList.remove('active');
+    document.getElementById('authError').textContent = '';
+    document.getElementById('authSuccess').textContent = '';
+}
+
+function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'register' : 'login';
+    const title = document.getElementById('authTitle');
+    const actionBtn = document.getElementById('authActionBtn');
+    const emailGroup = document.getElementById('authEmailGroup');
+    const switchText = document.getElementById('authSwitchText');
+    const switchLink = document.getElementById('authSwitchLink');
+    
+    if (authMode === 'register') {
+        title.textContent = 'Регистрация';
+        actionBtn.textContent = 'Зарегистрироваться';
+        emailGroup.style.display = 'block';
+        switchText.textContent = 'Уже есть аккаунт?';
+        switchLink.textContent = 'Войти';
+    } else {
+        title.textContent = 'Вход';
+        actionBtn.textContent = 'Войти';
+        emailGroup.style.display = 'none';
+        switchText.textContent = 'Нет аккаунта?';
+        switchLink.textContent = 'Зарегистрироваться';
+    }
+}
+
+async function handleAuth() {
+    const username = document.getElementById('authUsername').value;
+    const password = document.getElementById('authPassword').value;
+    const email = document.getElementById('authEmail').value;
+    const errorEl = document.getElementById('authError');
+    errorEl.textContent = '';
+    
+    try {
+        let resp;
+        if (authMode === 'register') {
+            resp = await fetch(`${API}/auth/api/register`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, email, password })
+            });
+        } else {
+            resp = await fetch(`${API}/auth/api/token`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, password })
+            });
+        }
+        
+        if (!resp.ok) {
+            let errData;
+            try {
+                errData = await resp.json();
+            } catch {
+                errorEl.textContent = 'Ошибка авторизации';
+                return;
+            }
+            
+            // FastAPI возвращает detail как массив или строку
+            let msg = 'Ошибка авторизации';
+            if (typeof errData.detail === 'string') {
+                msg = errData.detail;
+            } else if (Array.isArray(errData.detail)) {
+                msg = errData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ');
+            }
+            errorEl.textContent = msg;
+            return;
+        }
+        
+        const data = await resp.json();
+        accessToken = data.access_token;
+        refreshToken = data.refresh_token;
+        localStorage.setItem('access_token', accessToken);
+        if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+        
+        if (authMode === 'register') {
+            document.getElementById('authSuccess').textContent = 'Аккаунт создан! Теперь войдите.';
+            toggleAuthMode();
+            return;
+        }
+        
+        hideAuthModal();
+        await loadProfile();
+        document.getElementById('authBtn').style.display = 'none';
+        document.getElementById('logoutBtn').style.display = '';
+        document.getElementById('userInfo').style.display = '';
+        connectWebSocket();
+    } catch (e) {
+        errorEl.textContent = 'Ошибка соединения';
+    }
+}
+
+async function loadProfile() {
+    try {
+        const resp = await fetch(`${API}/user/api/users/${await getUserId()}/profile`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            currentUser = data;
+            document.getElementById('usernameDisplay').textContent = data.username;
+            document.getElementById('balanceDisplay').textContent = data.balance.toFixed(2);
+        }
+    } catch (e) {}
+}
+
+async function getUserId() {
+    // Decode JWT
+    if (!accessToken) return null;
+    try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        return payload.sub;
+    } catch { return null; }
+}
+
+function logout() {
+    accessToken = null;
+    refreshToken = null;
+    currentUser = null;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    document.getElementById('authBtn').style.display = '';
+    document.getElementById('logoutBtn').style.display = 'none';
+    document.getElementById('userInfo').style.display = 'none';
+    if (ws) ws.close();
+}
+
+// --- Products ---
+async function loadProducts() {
+    try {
+        const resp = await fetch(`${API}/products/api/products`);
+        const products = await resp.json();
+        const grid = document.getElementById('productsGrid');
+        grid.innerHTML = products.map(p => `
+            <div class="product-card">
+                <h3>${p.name}</h3>
+                <p class="description">${p.description || 'Нет описания'}</p>
+                <div class="price">${p.user_price.toFixed(2)} ₽</div>
+                <div class="stock">На складе: ${p.quantity} шт.</div>
+                <button class="btn btn-primary btn-small" onclick="addToCart(${p.id})" ${p.quantity === 0 ? 'disabled' : ''}>
+                    ${p.quantity === 0 ? 'Нет в наличии' : 'В корзину'}
+                </button>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('productsGrid').innerHTML = '<p>Ошибка загрузки товаров</p>';
+    }
+}
+
+// --- Cart ---
+
+// Event delegation for remove buttons
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.remove-btn');
+    if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        removeFromCart(parseInt(btn.dataset.productId));
+    }
+});
+
+async function loadCart() {
+    try {
+        const resp = await fetch(`${API}/cart/api/cart`, {
+            headers: { 'X-Session-Id': sessionId }
+        });
+        const data = await resp.json();
+        sessionId = data.session_id;
+        localStorage.setItem('session_id', sessionId);
+        
+        const items = data.items || [];
+        const itemsEl = document.getElementById('cartItems');
+        const totalSection = document.getElementById('cartTotalSection');
+        const countBadge = document.getElementById('cartCount');
+        
+        if (items.length === 0) {
+            itemsEl.innerHTML = '<p>Корзина пуста</p>';
+            totalSection.style.display = 'none';
+            countBadge.style.display = 'none';
+        } else {
+            itemsEl.innerHTML = items.map(item => `
+                <div class="cart-item">
+                    <div>
+                        <strong>${item.product_name}</strong><br>
+                        <span style="color:#27ae60">${item.user_price.toFixed(2)} ₽</span> × ${item.quantity}
+                    </div>
+                    <div>
+                        <span style="font-weight:bold">${(item.user_price * item.quantity).toFixed(2)} ₽</span>
+                        <button class="btn btn-danger btn-small remove-btn" data-product-id="${item.product_id}" style="margin-left:10px">×</button>
+                    </div>
+                </div>
+            `).join('');
+            totalSection.style.display = 'block';
+            document.getElementById('cartTotal').textContent = data.total.toFixed(2);
+            countBadge.textContent = items.reduce((s, i) => s + i.quantity, 0);
+            countBadge.style.display = '';
+        }
+    } catch (e) {}
+}
+
+async function addToCart(productId) {
+    try {
+        const resp = await fetch(`${API}/cart/api/cart/items`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Id': sessionId
+            },
+            body: JSON.stringify({ product_id: productId, quantity: 1 })
+        });
+        if (resp.ok) {
+            await loadCart();
+        }
+    } catch (e) {}
+}
+
+async function removeFromCart(productId) {
+    try {
+        const resp = await fetch(`${API}/cart/api/cart/items/${productId}`, {
+            method: 'DELETE',
+            headers: { 'X-Session-Id': sessionId }
+        });
+        if (resp.ok) {
+            await loadCart();
+        }
+    } catch (e) {
+        console.error('Remove error:', e);
+    }
+}
+
+async function clearCart() {
+    try {
+        await fetch(`${API}/cart/api/cart`, {
+            method: 'DELETE',
+            headers: { 'X-Session-Id': sessionId }
+        });
+        await loadCart();
+    } catch (e) {}
+}
+
+// --- Orders ---
+async function createOrder() {
+    if (!accessToken) {
+        showAuthModal();
+        return;
+    }
+    
+    const btn = document.getElementById('checkoutBtn');
+    btn.disabled = true;
+    btn.textContent = 'Оформление...';
+    
+    try {
+        const resp = await fetch(`${API}/orders/api/orders/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'X-Session-Id': sessionId
+            },
+            body: JSON.stringify({ session_id: sessionId })
+        });
+        
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert('Ошибка: ' + (err.detail || 'Неизвестная ошибка'));
+            return;
+        }
+        
+        const order = await resp.json();
+        const orderId = order.order_id ?? order.id ?? 'unknown';
+        const status = order.status ?? 'pending';
+        let msg = `Заказ #${orderId} принят в обработку.\nСтатус: ${status}`;
+        if (typeof order.total === 'number') {
+            msg += `\nСумма: ${order.total.toFixed(2)} ₽`;
+        }
+        alert(msg);
+        
+        await loadCart();
+        await loadProfile();
+        await loadOrders();
+    } catch (e) {
+        alert('Ошибка соединения');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Оформить заказ';
+    }
+}
+
+async function loadOrders() {
+    if (!accessToken) {
+        document.getElementById('ordersList').innerHTML = '<p>Войдите, чтобы увидеть заказы</p>';
+        return;
+    }
+    
+    try {
+        const resp = await fetch(`${API}/orders/api/orders`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (resp.ok) {
+            const orders = await resp.json();
+            const el = document.getElementById('ordersList');
+            
+            if (orders.length === 0) {
+                el.innerHTML = '<p>Заказов пока нет</p>';
+                return;
+            }
+            
+            el.innerHTML = orders.map(o => `
+                <div class="card" style="margin-bottom:15px">
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <h3>Заказ #${o.id}</h3>
+                        <span class="status-${o.status}">${o.status === 'paid' ? '✅ Оплачен' : o.status === 'pending' ? '⏳ Ожидает' : '❌ Отменён'}</span>
+                    </div>
+                    <p style="color:#888; font-size:0.85rem">${formatTime(o.created_at)}</p>
+                    <div style="margin-top:10px">
+                        ${o.items.map(i => `
+                            <div class="order-item">
+                                ${i.product_name} × ${i.quantity} — ${(i.price_paid * i.quantity).toFixed(2)} ₽
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="text-align:right; font-weight:bold; font-size:1.1rem; margin-top:10px">
+                        Итого: ${o.total.toFixed(2)} ₽
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            document.getElementById('ordersList').innerHTML = '<p>Не удалось загрузить заказы</p>';
+        }
+    } catch (e) {
+        document.getElementById('ordersList').innerHTML = '<p>Ошибка соединения</p>';
+    }
+}
+
+// --- WebSocket ---
+function connectWebSocket() {
+    if (!accessToken) return;
+    
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${location.host}/ws/notifications?token=${accessToken}`;
+    
+    try {
+        ws = new WebSocket(url);
+        
+        ws.onopen = () => {
+            document.getElementById('wsStatus').textContent = '⚡ WS: подключён';
+            document.getElementById('wsStatus').className = 'ws-status ws-connected';
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            addNotification(data);
+        };
+        
+        ws.onclose = () => {
+            document.getElementById('wsStatus').textContent = '⚡ WS: отключён';
+            document.getElementById('wsStatus').className = 'ws-status ws-disconnected';
+            // Reconnect after 5s
+            setTimeout(connectWebSocket, 5000);
+        };
+        
+        ws.onerror = () => ws.close();
+    } catch (e) {}
+}
+
+function addNotification(data) {
+    const container = document.getElementById('notifications');
+    if (container.querySelector('p')) container.innerHTML = '';
+    
+    const typeLabels = {
+        'order.created': '📦 Заказ создан',
+        'order.paid': '✅ Заказ оплачен',
+        'order.cancelled': '❌ Заказ отменён',
+        'payment.completed': '💳 Оплата прошла',
+        'payment.failed': '💳 Оплата не прошла',
+    };
+    
+    const notif = document.createElement('div');
+    notif.className = `notification ${data.type?.includes('fail') ? 'error' : 'success'}`;
+    notif.innerHTML = `
+        <strong>${typeLabels[data.type] || data.type}</strong><br>
+        <span style="font-size:0.85rem">${JSON.stringify(data.data)}</span><br>
+        <span class="time">${formatTime(new Date())}</span>
+    `;
+    container.prepend(notif);
+    
+    // Update badge for real-time notifications
+    const badge = document.getElementById('notifCount');
+    const current = parseInt(badge.textContent || '0');
+    badge.textContent = current + 1;
+    badge.style.display = '';
+}
+
+// Load notifications from API
+async function loadNotifications(userId) {
+    const container = document.getElementById('notifications');
+    if (!userId) {
+        container.innerHTML = '<p>Войдите, чтобы увидеть уведомления</p>';
+        return;
+    }
+    
+    try {
+        const resp = await fetch(`${API}/notifications/api/notifications/${userId}`);
+        const notifications = await resp.json();
+        
+        if (notifications.length === 0) {
+            container.innerHTML = '<p>Уведомлений пока нет</p>';
+            return;
+        }
+        
+        // Reset badge and re-render from API
+        notifCount = notifications.length;
+        const badge = document.getElementById('notifCount');
+        badge.textContent = notifCount;
+        badge.style.display = '';
+        
+        const typeLabels = {
+            'order.created': '📦 Заказ создан',
+            'order.paid': '✅ Заказ оплачен',
+            'order.cancelled': '❌ Заказ отменён',
+            'payment.completed': '💳 Оплата прошла',
+            'payment.failed': '💳 Оплата не прошла',
+        };
+        
+        container.innerHTML = '';
+        notifications.forEach(data => {
+            const notif = document.createElement('div');
+            notif.className = `notification ${data.type?.includes('fail') ? 'error' : 'success'}`;
+            notif.innerHTML = `
+                <strong>${typeLabels[data.type] || data.type}</strong><br>
+                <span style="font-size:0.85rem">${JSON.stringify(data.data)}</span><br>
+                <span class="time">${formatTime(new Date(data.timestamp))}</span>
+            `;
+            container.prepend(notif);
+        });
+    } catch (e) {
+        container.innerHTML = '<p>Ошибка загрузки уведомлений</p>';
+    }
+}
+
+// --- Event delegation ---
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.remove-btn');
+    if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        removeFromCart(parseInt(btn.dataset.productId));
+    }
+});
+
+// --- Start ---
+document.addEventListener('DOMContentLoaded', function() {
+    init();
+});
+</script>
+</body>
+</html>
