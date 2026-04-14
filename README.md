@@ -11,7 +11,6 @@
 ## Быстрый старт с нуля
 
 ```bash
-cd microservices
 cp .env.example .env
 ```
 
@@ -74,7 +73,6 @@ docker exec postgres psql -U postgres -d products -c "select count(*) from produ
 Все тесты в контейнерах:
 
 ```bash
-cd microservices
 for svc in auth-service user-service product-service cart-service order-service billing-service notification-service; do
   echo "=== $svc ==="
   docker compose run --rm "$svc" pytest -q
